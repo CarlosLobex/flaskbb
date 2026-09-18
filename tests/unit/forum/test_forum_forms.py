@@ -28,23 +28,28 @@ class TestTopicForm:
         assert topic.forum_id == forum.id
 
     @pytest.mark.parametrize(
-        "formdata",
+        "formdata, expected_valid",
         [
-            {"title": ""},
-            {"content": ""},
+            ({"title": "A valid title", "content": "Valid content"}, True),
+            (
+                {
+                    "title": "A valid title",
+                    "content": "Valid content",
+                    "track_topic": True,
+                },
+                True,
+            ),
+            ({"title": "", "content": "Valid content"}, False),
+            ({"title": "A valid title", "content": ""}, False),
         ],
     )
-    def test_invalid_inputs(self, formdata):
-        data = {
-            "title": "A brand new topic",
-            "content": "Some interesting content",
-            "submit": True,
-        }
+    def test_title_and_content_validation(self, formdata, expected_valid):
+        data = {"submit": True}
         data.update(formdata)
 
         form = forms.TopicForm(formdata=MultiDict(data), meta={"csrf": False})
 
-        assert not form.validate_on_submit()
+        assert form.validate_on_submit() is expected_valid
 
     def test_track_topic_calls_user_track_topic(self, forum, user, mocker):
         track_topic_spy = mocker.patch.object(user, "track_topic")
