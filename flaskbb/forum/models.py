@@ -999,11 +999,11 @@ class Topic(HideableCRUDMixin, db.Model):
         forum.post_count = db.session.scalar(stmt_post_count)
 
     def _restore_topic_to_forum(self):
-        if (
-            self.forum.last_post is None
-            or self.forum.last_post_created
+        forum_last_post_is_older_than_topic = (
+            self.forum.last_post_created is not None
             and self.forum.last_post_created < self.last_updated
-        ):
+        )
+        if self.forum.last_post is None or forum_last_post_is_older_than_topic:
             self.forum.last_post = self.last_post
             self.forum.last_post_title = self.title
             self.forum.last_post_user = self.user
