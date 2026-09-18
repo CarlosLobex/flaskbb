@@ -335,10 +335,7 @@ class Post(HideableCRUDMixin, db.Model):
                     # Update the last post info for the forum
                     topic.forum.set_last_post(self)
 
-                    # Update the post counts
-                    user.post_count += 1
-                    topic.post_count += 1
-                    topic.forum.post_count += 1
+                    self._increment_post_counts(user, topic)
 
             # And commit it!
             db.session.add(self)
@@ -361,6 +358,13 @@ class Post(HideableCRUDMixin, db.Model):
 
         db.session.commit()
         return self
+
+    def _increment_post_counts(self, user: "User", topic: "Topic") -> None:
+        """Increments the post counters for the user, the topic and the
+        forum affected by this new post."""
+        user.post_count += 1
+        topic.post_count += 1
+        topic.forum.post_count += 1
 
     @override
     def hide(self, user: "User"):
