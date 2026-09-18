@@ -1172,34 +1172,14 @@ class Forum(db.Model, CRUDMixin):
         if commit:
             db.session.commit()
 
-    def update_read(
-        self, user: "User", forumsread: ForumsRead | None, topicsread: TopicsRead | None
-    ):
-        """Updates the ForumsRead status for the user. In order to work
-        correctly, be sure that `topicsread is **not** `None`.
-
-        :param user: The user for whom we should check if he has read the
-                     forum.
-
-        :param forumsread: The forumsread object. It is needed to check if
-                           if the forum is unread. If `forumsread` is `None`
-                           and the forum is unread, it will create a new entry
-                           in the `ForumsRead` relation, else (and the forum
-                           is still unread) we are just going to update the
-                           entry in the `ForumsRead` relation.
-
-        :param topicsread: The topicsread object is used in combination
-                           with the forumsread object to check if the
-                           forumsread relation should be updated and
-                           therefore is unread.
+    def _count_unread_topics(self, user: "User", read_cutoff: datetime | None) -> int:
+        """Counts how many topics in this forum are still unread by
+        ``user``, considering ``read_cutoff`` (topics older than that
+        are not tracked). Extracted from ``update_read`` to separate
+        the query itself from the decision of what to do with the
+        result.
         """
-        if not user.is_authenticated or topicsread is None:
-            return False
-
-        read_cutoff = _calculate_read_cutoff()
-
-        # fetch the unread posts in the forum
-        unread_count = db.session.execute(
+        return db.session.execute(
             db.select(db.func.count())
             .select_from(Topic)
             .outerjoin(
@@ -1226,6 +1206,33 @@ class Forum(db.Model, CRUDMixin):
                 ),
             )
         ).scalar_one()
+
+    def update_read(
+        self, user: "User", forumsread: ForumsRead | None, topicsread: TopicsRead | None
+    ):
+        """Updates the ForumsRead status for the user. In order to work
+        correctly, be sure that `topicsread is **not** `None`.
+
+        :param user: The user for whom we should check if he has read the
+                     forum.
+
+        :param forumsread: The forumsread object. It is needed to check if
+                           if the forum is unread. If `forumsread` is `None`
+                           and the forum is unread, it will create a new entry
+                           in the `ForumsRead` relation, else (and the forum
+                           is still unread) we are just going to update the
+                           entry in the `ForumsRead` relation.
+
+        :param topicsread: The topicsread object is used in combination
+                           with the forumsread object to check if the
+                           forumsread relation should be updated and
+                           therefore is unread.
+        """
+        if not user.is_authenticated or topicsread is None:
+            return False
+
+        read_cutoff = _calculate_read_cutoff()
+        unread_count = self._count_unread_topics(user, read_cutoff)
 
         # No unread topics available - trying to mark the forum as read
         if unread_count == 0:
