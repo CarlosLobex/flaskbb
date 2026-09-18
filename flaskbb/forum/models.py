@@ -53,6 +53,17 @@ from flaskbb.utils.settings import flaskbb_config
 logger = logging.getLogger(__name__)
 
 
+def _calculate_read_cutoff() -> datetime | None:
+    """Returns the datetime before which a topic/forum is considered
+    too old to be tracked by the readtracker, based on the
+    ``TRACKER_LENGTH`` setting (in days). Returns ``None`` when the
+    tracker length is disabled (``TRACKER_LENGTH <= 0``).
+    """
+    if flaskbb_config["TRACKER_LENGTH"] > 0:
+        return time_utcnow() - timedelta(days=flaskbb_config["TRACKER_LENGTH"])
+    return None
+
+
 moderators = Table(
     "moderators",
     db.metadata,
@@ -680,11 +691,7 @@ class Topic(HideableCRUDMixin, db.Model):
         :param topicsread: The topicsread object is used to check if there is
                            a new post in the topic.
         """
-        read_cutoff = None
-        if flaskbb_config["TRACKER_LENGTH"] > 0:
-            read_cutoff = time_utcnow() - timedelta(
-                days=flaskbb_config["TRACKER_LENGTH"]
-            )
+        read_cutoff = _calculate_read_cutoff()
 
         # The tracker is disabled - abort
         if read_cutoff is None or self.last_post is None:
@@ -1189,11 +1196,7 @@ class Forum(db.Model, CRUDMixin):
         if not user.is_authenticated or topicsread is None:
             return False
 
-        read_cutoff = None
-        if flaskbb_config["TRACKER_LENGTH"] > 0:
-            read_cutoff = time_utcnow() - timedelta(
-                days=flaskbb_config["TRACKER_LENGTH"]
-            )
+        read_cutoff = _calculate_read_cutoff()
 
         # fetch the unread posts in the forum
         unread_count = db.session.execute(
