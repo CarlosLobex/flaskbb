@@ -932,6 +932,23 @@ class RawPost(MethodView):
 
 
 class MarkRead(MethodView):
+    """Marks forums as read for the current user (``POST`` only).
+
+    The mode depends on whether ``forum_id`` is given:
+
+    * With ``forum_id``: deletes the user's ``TopicsRead`` rows of that forum
+      and sets ``ForumsRead.last_read`` and ``ForumsRead.cleared`` to now,
+      creating the ``ForumsRead`` row if it does not exist. Redirects to the
+      forum.
+    * Without ``forum_id``: deletes *all* the user's ``ForumsRead`` and
+      ``TopicsRead`` rows and creates a new ``ForumsRead`` for every forum in
+      the database, without checking access to each one. Redirects to the
+      forum index.
+
+    ``slug`` is only there so the ``/<forum_id>-<slug>/markread`` URL
+    matches; it is not used. The view requires a logged in user with
+    access to the forum (``CanAccessForum``).
+    """
     decorators = [
         login_required,
         allows.requires(

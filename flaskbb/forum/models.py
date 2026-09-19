@@ -397,6 +397,24 @@ class Post(HideableCRUDMixin, db.Model):
         return self
 
     def _deal_with_last_post(self):
+        """Moves the "last post" references away from this post.
+
+        Called by :meth:`delete` and :meth:`hide` *before* the counters are
+        recalculated by :meth:`_update_counts`. It only does something when
+        this post is the last post of its topic:
+
+        1. If it is also the last post of the forum, the non-hidden post with
+           the highest id in the forum (excluding this one) becomes the
+           forum's last post. If there is none, the forum's last-post
+           information is cleared.
+        2. The topic's last post becomes its second last post. If the topic
+           has none, the first post takes over.
+        3. ``topic.last_updated`` is set to the creation date of the new last
+           post.
+
+        The changes are only staged in the session; committing is up to the
+        caller.
+        """
         if self.topic.last_post == self:
             # update the last post in the forum
             if self.topic.last_post == self.topic.forum.last_post:
@@ -431,6 +449,22 @@ class Post(HideableCRUDMixin, db.Model):
             self.topic.last_updated = self.topic.last_post.date_created
 
     def _update_counts(self):
+        """Recalculates the post counters of the author, the topic and the
+        forum by counting posts in the database, not by incrementing them.
+
+        Whether this post is part of the count depends on its current
+        ``hidden`` flag, so callers must change the flag *before* calling
+        (committing is not required):
+
+        * ``hidden`` is ``True``: this post is left out of the counts.
+        * ``hidden`` is ``False``: this post is counted explicitly, even if
+          the flag has not been written to the database yet.
+
+        Posts inside hidden topics are not counted for the author or the
+        forum, and the counter of a hidden topic is set to ``0``.
+
+        Used by :meth:`delete`, :meth:`hide` and :meth:`unhide`.
+        """
         if self.hidden:
             clauses = [Post.hidden.is_(False), Post.id != self.id]
         else:
